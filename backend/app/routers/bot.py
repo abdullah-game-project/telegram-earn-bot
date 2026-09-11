@@ -11,7 +11,7 @@ settings = get_settings()
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher()
 
-router = APIRouter()
+bot_router = APIRouter()   # renamed to avoid confusion
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
@@ -24,14 +24,16 @@ async def cmd_start(message: Message):
 
 @dp.message(Command("balance"))
 async def cmd_balance(message: Message):
-    # Temporary simple reply — real balance will come from database later
     await message.answer("💰 Balance feature coming soon. Open the Mini App for full details.")
 
 @dp.message(Command("id"))
 async def cmd_id(message: Message):
-    await message.answer(f"Your Telegram ID: <code>{message.from_user.id}</code>", parse_mode="HTML")
+    await message.answer(
+        f"Your Telegram ID: <code>{message.from_user.id}</code>",
+        parse_mode="HTML"
+    )
 
-@router.post("/bot/webhook")
+@bot_router.post("/webhook")
 async def telegram_webhook(request: Request):
     try:
         data = await request.json()
