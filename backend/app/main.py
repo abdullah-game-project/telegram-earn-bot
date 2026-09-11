@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database import engine, Base
-from app.routers import api, bot
+from app.routers import api
+from app.routers.bot import bot_router
 from app.config import get_settings
 import logging
 
@@ -34,7 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(api.router)
-app.include_router(bot.router)
+app.include_router(bot_router, prefix="/bot")
 
 @app.get("/")
 async def root():
