@@ -25,7 +25,7 @@ export async function getMe(token: string) {
 }
 
 // These will be real once we add backend endpoints
-export async function getTransactions(token: string): Promise<any[]> {
+export async function getTransactions(): Promise<any[]> {
   // Placeholder – returns empty until backend endpoint is ready
   return [];
 }
