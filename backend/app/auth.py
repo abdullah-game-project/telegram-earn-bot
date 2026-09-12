@@ -33,8 +33,8 @@ def validate_init_data(init_data: str) -> dict:
     )
 
     secret_key = hmac.new(
-        key=b"WebAppData",
-        msg=settings.BOT_TOKEN.encode(),
+        key=settings.BOT_TOKEN.encode(),
+        msg=b"WebAppData",
         digestmod=hashlib.sha256
     ).digest()
 
@@ -57,57 +57,6 @@ def validate_init_data(init_data: str) -> dict:
         )
         raise HTTPException(status_code=401, detail="Invalid hash")
 
-    try:
-        auth_date = int(parsed.get("auth_date", 0))
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid auth_date")
-
-    if time.time() - auth_date > 600:
-        raise HTTPException(status_code=401, detail="initData expired")
-
-    return parsed
-
-    # Remove signature (Bot API 7+/8+)
-    parsed.pop("signature", None)
-
-    # Official data_check_string
-    data_check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(parsed.items())
-    )
-
-    secret_key = hmac.new(
-        key=b"WebAppData",
-        msg=settings.BOT_TOKEN.encode(),
-        digestmod=hashlib.sha256
-    ).digest()
-
-    calculated_hash = hmac.new(
-        key=secret_key,
-        msg=data_check_string.encode(),
-        digestmod=hashlib.sha256
-    ).hexdigest()
-
-    if not hmac.compare_digest(calculated_hash, received_hash):
-        # Safe debug – add a non-reversible fingerprint of the bot token
-        if settings.BOT_TOKEN:
-            token_fingerprint = hashlib.sha256(settings.BOT_TOKEN.encode()).hexdigest()[:8]
-            token_tail = settings.BOT_TOKEN[-6:]
-        else:
-            token_fingerprint = "EMPTY"
-            token_tail = "EMPTY"
-
-        logger.error(
-            f"HASH MISMATCH | "
-            f"token_fingerprint={token_fingerprint} | "
-            f"token_tail=...{token_tail} | "
-            f"received={received_hash[:12]}... | "
-            f"calculated={calculated_hash[:12]}... | "
-            f"auth_date={parsed.get('auth_date')} | "
-            f"keys={list(parsed.keys())}"
-        )
-        raise HTTPException(status_code=401, detail="Invalid hash")
-
-    # Check expiration (10 minutes)
     try:
         auth_date = int(parsed.get("auth_date", 0))
     except ValueError:
