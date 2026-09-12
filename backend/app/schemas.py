@@ -27,13 +27,29 @@ class BalanceResponse(BaseModel):
 
 class TransactionResponse(BaseModel):
     id: int
-    type: str  # "earn", "withdraw", "adjustment"
-    amount: Decimal
+    amount: str
+    type: str
+    status: str
     description: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+class TransactionListResponse(BaseModel):
+    transactions: list[TransactionResponse]
+    total: int
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    value: str
+    display_name: str
+
+class LeaderboardResponse(BaseModel):
+    leaderboard: list[LeaderboardEntry]
 
 class TopPayoutResponse(BaseModel):
     rank: int
