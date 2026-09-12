@@ -24,3 +24,26 @@ class AuthResponse(BaseModel):
 class BalanceResponse(BaseModel):
     balance: Decimal
     telegram_id: int
+
+class TransactionResponse(BaseModel):
+    id: int
+    type: str  # "earn", "withdraw", "adjustment"
+    amount: Decimal
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TopPayoutResponse(BaseModel):
+    rank: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    amount: Decimal
+
+class TopReferrerResponse(BaseModel):
+    rank: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    referrals: int
+    earnings: Decimal
