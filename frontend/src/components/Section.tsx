@@ -1,0 +1,1 @@
+export default function Section({title,action,children}:{title:string;action?:React.ReactNode;children:React.ReactNode}){return <section className="section"><div className="section-head"><h2>{title}</h2>{action}</div>{children}</section>}
