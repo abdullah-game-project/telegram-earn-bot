@@ -46,11 +46,20 @@ def validate_init_data(init_data: str) -> dict:
     ).hexdigest()
 
     if not hmac.compare_digest(calculated_hash, received_hash):
-        # Temporary debug (remove after fix)
+        # Safe debug – add a non-reversible fingerprint of the bot token
+        if settings.BOT_TOKEN:
+            token_fingerprint = hashlib.sha256(settings.BOT_TOKEN.encode()).hexdigest()[:8]
+            token_tail = settings.BOT_TOKEN[-6:]
+        else:
+            token_fingerprint = "EMPTY"
+            token_tail = "EMPTY"
+
         logger.error(
             f"HASH MISMATCH | "
-            f"received={received_hash[:16]}... | "
-            f"calculated={calculated_hash[:16]}... | "
+            f"token_fingerprint={token_fingerprint} | "
+            f"token_tail=...{token_tail} | "
+            f"received={received_hash[:12]}... | "
+            f"calculated={calculated_hash[:12]}... | "
             f"auth_date={parsed.get('auth_date')} | "
             f"keys={list(parsed.keys())}"
         )
