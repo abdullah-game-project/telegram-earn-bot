@@ -1,10 +1,9 @@
-import hmac
-import hashlib
 import time
 import logging
-from urllib.parse import parse_qsl
+import json
 from fastapi import HTTPException
 from jose import jwt
+from aiogram.utils.web_app import check_webapp_signature, safe_parse_webapp_init_data
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -12,61 +11,41 @@ settings = get_settings()
 
 
 def validate_init_data(init_data: str) -> dict:
-    """Strict Telegram WebApp initData validation"""
-    if not init_data or not isinstance(init_data, str):
+    """Official Telegram WebApp validation using aiogram."""
+    if not init_data:
         raise HTTPException(status_code=401, detail="Missing initData")
 
-    try:
-        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid initData format")
-
-    received_hash = parsed.pop("hash", None)
-    if not received_hash:
-        raise HTTPException(status_code=401, detail="Missing hash")
-
-    # Remove signature (Bot API 7+/8+)
-    parsed.pop("signature", None)
-
-    data_check_string = "\n".join(
-        f"{k}={v}" for k, v in sorted(parsed.items())
-    )
-
-    secret_key = hmac.new(
-        key=settings.BOT_TOKEN.encode(),
-        msg=b"WebAppData",
-        digestmod=hashlib.sha256
-    ).digest()
-
-    calculated_hash = hmac.new(
-        key=secret_key,
-        msg=data_check_string.encode(),
-        digestmod=hashlib.sha256
-    ).hexdigest()
-
-    if not hmac.compare_digest(calculated_hash, received_hash):
-        # Safe debug – shows only last 6 characters of the token
+    if not check_webapp_signature(settings.BOT_TOKEN, init_data):
         token_tail = settings.BOT_TOKEN[-6:] if settings.BOT_TOKEN else "EMPTY"
-        logger.error(
-            f"HASH MISMATCH | "
-            f"token_tail=...{token_tail} | "
-            f"received={received_hash[:12]}... | "
-            f"calculated={calculated_hash[:12]}... | "
-            f"auth_date={parsed.get('auth_date')} | "
-            f"keys={list(parsed.keys())}"
-        )
+        logger.error(f"HASH MISMATCH (aiogram) | token_tail=...{token_tail}")
         raise HTTPException(status_code=401, detail="Invalid hash")
 
     try:
-        auth_date = int(parsed.get("auth_date", 0))
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid auth_date")
+        parsed = safe_parse_webapp_init_data(settings.BOT_TOKEN, init_data)
+    except ValueError as e:
+        logger.error(f"Parse error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid initData")
 
+    auth_date = (
+        parsed.auth_date.timestamp()
+        if hasattr(parsed.auth_date, "timestamp")
+        else int(parsed.auth_date)
+    )
     if time.time() - auth_date > 600:
         raise HTTPException(status_code=401, detail="initData expired")
 
-    return parsed
+    result = {"auth_date": str(int(auth_date))}
+    if parsed.user:
+        result["user"] = json.dumps({
+            "id": parsed.user.id,
+            "first_name": parsed.user.first_name,
+            "last_name": getattr(parsed.user, "last_name", None),
+            "username": getattr(parsed.user, "username", None),
+            "language_code": getattr(parsed.user, "language_code", None),
+            "is_premium": getattr(parsed.user, "is_premium", False),
+        }, ensure_ascii=False)
 
+    return result
 
 def create_access_token(telegram_id: int) -> str:
     expire = time.time() + (settings.JWT_EXPIRE_MINUTES * 60)
