@@ -1,53 +1,8 @@
-import { useAuth } from "./hooks/useAuth";
-import { Header } from "./components/Header";
-import { BalanceCard } from "./components/BalanceCard";
-import { ActionButtons } from "./components/ActionButtons";
-import { LiveTransactions } from "./components/LiveTransactions";
-import { TopPayouts } from "./components/TopPayouts";
-import { TopReferrers } from "./components/TopReferrers";
-import { Loader2 } from "lucide-react";
-
-export default function App() {
-  const { user, loading, error, refreshBalance } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-premium-900">
-        <Loader2 className="w-10 h-10 text-gold-400 animate-spin" />
-        <p className="text-gray-400 text-sm">Connecting to Earn Bot...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-premium-900">
-        <p className="text-red-400 text-center mb-4">{error}</p>
-        <p className="text-gray-500 text-sm text-center">
-          Please open this app from the Telegram bot.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-premium-900 pb-10">
-      <Header firstName={user?.first_name} username={user?.username} />
-      
-      <BalanceCard
-        balance={user?.balance || "0"}
-        onRefresh={refreshBalance}
-      />
-
-      <ActionButtons />
-
-      <LiveTransactions />
-      <TopPayouts />
-      <TopReferrers />
-
-      <div className="text-center text-xs text-gray-600 mt-4 pb-6">
-        Earn Bot • 90% to users
-      </div>
-    </div>
-  );
-}
+import {useEffect,useMemo,useState} from 'react'; import {LoaderCircle,RefreshCw} from 'lucide-react'; import type {Auth,Referral,Tx,User,Withdrawal,Leader} from './types'; import {auth,me,transactions,withdrawals,referral,payouts,referrers,withdraw as sendWithdraw} from './lib/api'; import {setupTG,haptic,getTG} from './lib/tg'; import Nav,{Tab} from './components/Nav'; import Home from './pages/Home'; import Earn from './pages/Earn'; import Friends from './pages/Friends'; import Wallet from './pages/Wallet'; import Leaderboard from './pages/Leaderboard'; import './index.css';
+function App(){const [tab,setTab]=useState<Tab>('home');const [authState,setAuthState]=useState<Auth|null>(null);const [balance,setBalance]=useState('0');const [tx,setTx]=useState<Tx[]>([]);const [wd,setWd]=useState<Withdrawal[]>([]);const [ref,setRef]=useState<Referral|null>(null);const [payout,setPayout]=useState<Leader[]>([]);const [refs,setRefs]=useState<Leader[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [modal,setModal]=useState(false);const [amount,setAmount]=useState('');const [method,setMethod]=useState('');const [address,setAddress]=useState('');const user=authState?.user as User|undefined;
+const load=async(token:string)=>{const [m,t,w,r,p,rr]=await Promise.all([me(token),transactions(token),withdrawals(token),referral(token),payouts(token),referrers(token)]);setBalance(m.balance);setTx(t.transactions);setWd(w);setRef(r);setPayout(p.leaderboard);setRefs(rr.leaderboard);};
+useEffect(()=>{setupTG();const tg=getTG();const init=tg?.initData||'';(async()=>{try{let stored=localStorage.getItem('earn_auth');let a:Auth|null=stored?JSON.parse(stored):null;if(!a?.access_token){if(!init)throw new Error('Open this app from Telegram to continue.');a=await auth(init);localStorage.setItem('earn_auth',JSON.stringify(a));}setAuthState(a);await load(a.access_token)}catch(e:any){setError(e.message||'Unable to load app')}finally{setLoading(false)}})()},[]);
+const doWithdraw=async()=>{if(!authState)return;const n=Number(amount);if(!n||n<=0||!method||!address){setError('Enter a valid amount, payout method and address.');return}try{await sendWithdraw(authState.access_token,{amount:n,payout_method:method,payout_address:address,idempotency_key:crypto.randomUUID()});haptic('success');setModal(false);setAmount('');setMethod('');setAddress('');await load(authState.access_token)}catch(e:any){setError(e.message||'Withdrawal failed')}};
+const content=useMemo(()=>{if(!user)return null;switch(tab){case'earn':return <Earn/>;case'friends':return <Friends data={ref}/>;case'wallet':return <Wallet balance={balance} items={wd} onWithdraw={()=>setModal(true)}/>;case'leaderboard':return <Leaderboard payouts={payout} refs={refs}/>;default:return <Home user={user} balance={balance} tx={tx} onWithdraw={()=>setModal(true)} onEarn={()=>setTab('earn')} onFriends={()=>setTab('friends')}/>}},[tab,user,balance,tx,wd,ref,payout,refs]);
+if(loading)return <div className="splash"><div className="logo">E</div><LoaderCircle className="spin" size={28}/><span>Loading your rewards…</span></div>;if(error&&!authState)return <div className="splash"><div className="logo">E</div><h2>Welcome to Earnly</h2><p>{error}</p><button className="primary" onClick={()=>location.reload()}><RefreshCw size={16}/> Try again</button></div>;return <><main>{content}</main><Nav tab={tab} setTab={setTab}/>{error&&<button className="toast" onClick={()=>setError('')}>{error}</button>}{modal&&<div className="modal-backdrop" onClick={()=>setModal(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="section-head"><h2>Withdraw coins</h2><button className="close" onClick={()=>setModal(false)}>×</button></div><p className="muted">Balance: {Number(balance).toLocaleString()} coins</p><label>Amount<input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0"/></label><label>Payout method<input value={method} onChange={e=>setMethod(e.target.value)} placeholder="e.g. bKash / USDT"/></label><label>Payout address<input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Your payout address"/></label><button className="primary full" onClick={doWithdraw}>Submit withdrawal <ArrowUpRightIcon/></button></div></div>}</>}
+function ArrowUpRightIcon(){return <span>↗</span>} export default App;
